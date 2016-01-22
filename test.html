@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Getting to philosophy</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+</head>
+<body onLoad="setupGraph();">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+<script type="text/javascript" src="target/scala-2.11/getting-to-philosophy-fastopt.js"></script>
+
+<script src="http://d3js.org/d3.v3.js"></script>
+<script src="http://cpettitt.github.io/project/graphlib-dot/v0.5.2/graphlib-dot.js"></script>
+<script src="http://cpettitt.github.io/project/dagre-d3/latest/dagre-d3.js"></script>
+<script>
+var inputGraph = ""
+var renderGraph
+
+function showPageContent() {
+  $("#content").show()
+  $("#graphcontent").hide()
+}
+
+
+function setupGraph() {
+
+  $("#content").hide()
+  $("#graphcontent").show()
+
+
+  // Set up zoom support
+  var svg = d3.select("#graphsvg"),
+      inner = d3.select("#graphsvg g"),
+      zoom = d3.behavior.zoom().on("zoom", function() {
+        inner.attr("transform", "translate(" + d3.event.translate + ")" +
+                                    "scale(" + d3.event.scale + ")");
+      });
+  svg.call(zoom);
+
+  // Create and configure the renderer
+  renderGraph = dagreD3.render();
+}
+
+function tryDrawGraph() {
+  var g;
+  try {
+    g = graphlibDot.read("digraph {\n"+inputGraph+"}");
+  } catch (e) {
+    throw e;
+  }
+
+  // Set margins, if not present
+  if (!g.graph().hasOwnProperty("marginx") &&
+      !g.graph().hasOwnProperty("marginy")) {
+    g.graph().marginx = 20;
+    g.graph().marginy = 20;
+  }
+
+  g.graph().transition = function(selection) {
+    return selection.transition().duration(500);
+  };
+
+  // Render the graph into svg g
+  d3.select("#graphsvg g").call(renderGraph, g);
+}
+</script>
+<style>
+  svg {
+  border: 1px solid #999;
+  overflow: hidden;
+  }
+
+  .node {
+  white-space: nowrap;
+  }
+
+  .node rect,
+  .node circle,
+  .node ellipse {
+  stroke: #333;
+  fill: #fff;
+  stroke-width: 1.5px;
+  }
+
+  .cluster rect {
+  stroke: #333;
+  fill: #000;
+  fill-opacity: 0.1;
+  stroke-width: 1.5px;
+  }
+
+  .edgePath path.path {
+  stroke: #333;
+  stroke-width: 1.5px;
+  fill: none;
+  }
+</style>
+
+<script>runner = philosophy.runner()</script>
+<div class="container">
+  <div class="row">
+    <div class="col-xs-4">
+      <p>Program type</p>
+      <ul class="nav nav-pills nav-justified">
+        <li role="presentation" data-toggle="pill" class="active"><a href="javascript:void(0);" onclick="runner.oo()">Oo</a></li>
+        <li role="presentation" data-toggle="pill"><a href="javascript:void(0);" onclick="runner.free()">Free</a></li>
+        <li role="presentation" data-toggle="pill"><a href="javascript:void(0);" onclick="runner.fintag()">Finally tagless</a></li>
+      </ul><br>
+      <p>First page:</p>
+      <ul class="nav nav-pills nav-justified">
+        <li role="presentation" data-toggle="pill" class="active"><a href="javascript:void(0);" onclick="runner.random()">Random</a></li>
+        <li role="presentation" data-toggle="pill"><a href="javascript:void(0);" onclick="runner.const()"><input type="text" id="consttext" value="Monad" class="form-control" onchange="runner.const()"></a></li>
+      </ul><br>
+      <p>Output:</p>
+      <ul class="nav nav-pills nav-justified">
+        <li role="presentation" data-toggle="pill" class="active"><a href="javascript:void(0);" onclick="runner.graph()">Graph</a></li>
+        <li role="presentation" data-toggle="pill"><a href="javascript:void(0);" onclick="runner.page()">Page</a></li>
+        <li role="presentation" data-toggle="pill"><a href="javascript:void(0);" onclick="runner.console()">Console</a></li>
+      </ul><br>
+      <p class="panel-heading">Wiki:</p>
+      <ul class="nav nav-pills nav-justified">
+        <li role="presentation" data-toggle="pill" class="active"><a href="javascript:void(0);" onclick="runner.jsonpwiki()">JSONP</a></li>
+        <li role="presentation" data-toggle="pill"><a href="javascript:void(0);" onclick="runner.testwiki()">Test</a></li>
+      </ul>
+    </div>
+    <div class="panel-body col-xs-8">
+      <a class="btn btn-primary btn-sm" href="javascript:runner.run()">Run</a><br><br>
+      <div id="content"></div>
+      <div id="graphcontent"><svg id="graphsvg" width="800" height="600"><g/></svg></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
