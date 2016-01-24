@@ -1,5 +1,6 @@
 package philosophy.finallytagless
 
+
 import language.higherKinds
 import scala.scalajs.js.JSApp
 import org.scalajs.dom._
@@ -10,6 +11,7 @@ import philosophy.{Graph, wikiapi, RFuture}
 import philosophy.RFuture._
 import philosophy.IO._
 import philosophy.crawlStates._
+import philosophy.finallytagless.Interpreter.~
 
 trait Wiki[F[_]] {
   def randomPage : F[String]
@@ -56,12 +58,12 @@ class HTMLOutput( outputElement: Element ) extends Output[IO] {
 }
 
 object GraphOutput extends Output[IO] {
-  override def firstPage(name: String): IO[Unit] = Io { Graph.addNode( name ) }
-  override def pageStep(from: String, to: String, idx: Int): IO[Unit] = Io {
+  def firstPage(name: String): IO[Unit] = Io { Graph.addNode( name ) }
+  def pageStep(from: String, to: String, idx: Int): IO[Unit] = Io {
     Graph.addNode( to )
     Graph.addLink( from, to )
   }
-  override def statusMsg(msg: String): IO[Unit] = Io {
+  def statusMsg(msg: String): IO[Unit] = Io {
     println( msg )
   }
 }
@@ -71,8 +73,8 @@ trait Input[F[_]] {
 }
 
 object RandomPageInput extends ( Input ~~> Wiki ) {
-  override def embed[M[_] : Monad]( wiki: Interpreter[Wiki, M]): Input[M] = new Input[M] {
-    override def getPage: M[String] = wiki( _.randomPage )
+  def embed[M[_] : Monad]( wiki: Interpreter[Wiki, M]): Input[M] = new Input[M] {
+    def getPage: M[String] = wiki( _.randomPage )
   }
 }
 
@@ -92,8 +94,8 @@ object UI {
   def finished(state: CrawlStateFinished ) : Term[UI,Unit] = Term[UI]{ _.finished(state) }
 }
 
-object UIToInputOutput extends ( UI ~~> IPair[Input,Output,?[_]] ) {
-  def embed[M[_] : Monad]( inputOutput: Interpreter[IPair[Input,Output,?[_]], M]): UI[M] = new UI[M] {
+object UIToInputOutput extends ( UI ~~> (Input~Output)#Pair ) {
+  def embed[M[_] : Monad]( inputOutput: Interpreter[(Input~Output)#Pair, M]): UI[M] = new UI[M] {
     val (input,output) = Interpreter.pairOf( inputOutput )
     def getStartPage: M[Continue] = for {
       page <- input {_.getPage}
@@ -114,7 +116,7 @@ object UIToInputOutput extends ( UI ~~> IPair[Input,Output,?[_]] ) {
 
 
 object program {
-  type WikiAndUI[M[_]] = IPair[Wiki,UI,M]
+  type WikiAndUI[M[_]] = (Wiki~UI)#Pair[M]
   type PRG[X] = Term[WikiAndUI,X]
   def pure[X]( x:X ) : PRG[X] = Term.pure[WikiAndUI,X]( x )
 

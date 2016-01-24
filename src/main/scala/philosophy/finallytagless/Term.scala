@@ -30,7 +30,7 @@ trait TermBuilder[F[_[_]]] {
   type X[_]
   def apply[A]( f : F[X]=>X[A] ) : Term[F,A] = new Term[F,A] {
     def run[M[_] : Monad](interpreter: Interpreter[F, M]): M[A] =
-      interpreter.nt( f.asInstanceOf[F[interpreter.G] => interpreter.G[A]]( interpreter.init ) )
+      interpreter.apply( f.asInstanceOf[F[interpreter.G] => interpreter.G[A]] )
   }
 }
 
@@ -44,26 +44,26 @@ trait ~~>[F[_[_]],G[_[_]]] extends Embed[F,G] {
 }
 
 object Embed {
-  implicit def embedLeft[F[_[_]],G[_[_]]] = new Embed[F,IPair[F,G,?[_]]] {
-    def apply[M[_] : Monad](f: Interpreter[IPair[F,G,?[_]],M]): Interpreter[F,M] = Interpreter.leftOf( f )
+  implicit def embedLeft[F[_[_]],G[_[_]]] = new Embed[F,InterpreterPair[F,G,?[_]]] {
+    def apply[M[_] : Monad](f: Interpreter[InterpreterPair[F,G,?[_]],M]): Interpreter[F,M] = Interpreter.leftOf( f )
   }
   implicit def embedRefl[F[_[_]]] = new Embed[F,F] {
     def apply[M[_] : Monad](f: Interpreter[F, M]): Interpreter[F, M] = f
   }
-  implicit def embedRight[F[_[_]],G[_[_]],H[_[_]]]( implicit E: Embed[F,H]) = new Embed[F,IPair[G,H,?[_]]] {
-    def apply[M[_] : Monad](f: Interpreter[IPair[G,H,?[_]], M]): Interpreter[F, M] = E( Interpreter.rightOf(f) )
+  implicit def embedRight[F[_[_]],G[_[_]],H[_[_]]]( implicit E: Embed[F,H]) = new Embed[F,InterpreterPair[G,H,?[_]]] {
+    def apply[M[_] : Monad](f: Interpreter[InterpreterPair[G,H,?[_]], M]): Interpreter[F, M] = E( Interpreter.rightOf(f) )
   }
 }
 
-case class IPair[F[_[_]],G[_[_]],M[_]]( left: Interpreter[F,M], right: Interpreter[G,M] )
 trait Interpreter[F[_[_]],M[_]] { self =>
+  import Interpreter.~
   type G[_]
   def init : F[G]
   def nt : G ~> M
   def andThen[H[_]]( n : M ~> H ) : Interpreter[F,H] =
     InterpreterNT[F,G,H]( init, nt andThen n )
-  def and[H[_[_]]]( i: Interpreter[H,M] ) : Interpreter[IPair[F,H,?[_]],M] =
-    InterpreterInit[IPair[F,H,?[_]],M]( IPair(self, i ) )
+  def and[H[_[_]]]( i: Interpreter[H,M] ) : Interpreter[(F~H)#Pair,M] =
+    InterpreterInit[InterpreterPair[F,H,?[_]],M]( InterpreterPair(self, i ) )
   def apply[A]( f: F[G] => G[A] ) : M[A] = nt( f( init ) )
 }
 case class InterpreterInit[F[_[_]],M[_]]( init: F[M] ) extends Interpreter[F,M] {
@@ -75,11 +75,17 @@ case class InterpreterInit[F[_[_]],M[_]]( init: F[M] ) extends Interpreter[F,M] 
 case class InterpreterNT[F[_[_]],G0[_],M[_]]( init: F[G0], nt: G0 ~> M) extends Interpreter[F,M] {
   type G[X] = G0[X]
 }
+case class InterpreterPair[F[_[_]],G[_[_]],M[_]]( left: Interpreter[F,M], right: Interpreter[G,M] )
+
 object Interpreter {
   def apply[F[_[_]],M[_]]( fm : F[M] ) : Interpreter[F,M] = InterpreterInit[F,M]( fm )
   def apply[F[_[_]],H[_],M[_]]( fm : F[H], nt: H ~> M ) : Interpreter[F,M] = InterpreterNT( fm, nt )
-  def rightOf[F[_[_]],G[_[_]],M[_]]( i : Interpreter[IPair[F,G,?[_]],M] ) : Interpreter[G,M] = i.init.right andThen i.nt
-  def leftOf[F[_[_]],G[_[_]],M[_]]( i : Interpreter[IPair[F,G,?[_]],M] ) : Interpreter[F,M] = i.init.left andThen i.nt
-  def pairOf[F[_[_]],G[_[_]],M[_]]( i : Interpreter[IPair[F,G,?[_]],M] ) : (Interpreter[F,M],Interpreter[G,M]) = (Interpreter.leftOf(i),Interpreter.rightOf(i))
+  type ~[A[_[_]],B[_[_]]] = ({
+    type Pair[X[_]] = InterpreterPair[A,B,X]
+    type ![X[_]] = InterpreterPair[A,B,X]
+  })
+  def rightOf[F[_[_]],G[_[_]],M[_]]( i : Interpreter[(F~G)#Pair,M] ) : Interpreter[G,M] = i.init.right andThen i.nt
+  def leftOf[F[_[_]],G[_[_]],M[_]]( i : Interpreter[(F~G)#Pair,M] ) : Interpreter[F,M] = i.init.left andThen i.nt
+  def pairOf[F[_[_]],G[_[_]],M[_]]( i : Interpreter[(F~G)#Pair,M] ) : (Interpreter[F,M],Interpreter[G,M]) = (Interpreter.leftOf(i),Interpreter.rightOf(i))
 }
 
